@@ -9,13 +9,10 @@ from Filter import *
 inputSound = loadSoundFromFile('static.wav')
 
 zeroList = []
-zeroList.append(-0.25 + 0.1j)
-zeroList.append(-0.25 - 0.1j)
-zeroList.append(0.5 + 0.j)
+zeroList.append(-0.5)
 
 poleList = []
-poleList.append(-0.5j)
-poleList.append(0.5j)
+poleList.append(0.5)
 
 testFilter = Filter(zeroList, poleList)
 filteredSamples = testFilter.filterStream(inputSound.sampleFloats)
@@ -26,9 +23,9 @@ inputSound.sampleFloats = filteredSamples
 
 format = sound.AFMT_S16_LE
 snd = sound.Output(inputSound.sampleRate, inputSound.channelCount, format)
-snd.play(getWaveBytes(inputSound))
+#snd.play(getWaveBytes(inputSound))
 
-normalizedSoundFloats = filteredSamples
+#normalizedSoundFloats = filteredSamples
 
 top = Tkinter.Tk()
 
@@ -159,8 +156,13 @@ canvasHeight = 400
 
 zPlane = Tkinter.Canvas(top, bg="white", width=canvasWidth, height=canvasHeight)
 sPlane = Tkinter.Canvas(top, bg="white", width=canvasWidth, height=canvasHeight)
-frame = Tkinter.Frame(top, width=canvasWidth, height=canvasHeight)
+topFrame = Tkinter.Frame(top)
+frame = Tkinter.Frame(topFrame)
+buttonFrame = Tkinter.Frame(topFrame)
 button = Tkinter.Button(top, text="build and play")
+poleButton = Tkinter.Button(buttonFrame, text="add pole")
+zeroButton = Tkinter.Button(buttonFrame, text="add zero")
+loadButton = Tkinter.Button(top, text="load sound")
 
 '''
 Scale is determined by (canvasWidth-1) divided by domain of the graph
@@ -405,8 +407,22 @@ def sPlaneMouseClick(event):
 def rclick(event):
     removeActiveEntry()
 
-def mclick(event):
+def addPole():
+    addNewEntry(0.5, False)
+
+def addZero():
     addNewEntry(0.5, True)
+
+def loadSound():
+    global inputSound
+    global originalSamples
+
+    filename = tkFileDialog.askopenfilename(filetypes=[("Waveform Audio", ".wav")])
+    #print filename
+    inputSound = loadSoundFromFile(filename)
+    #print inputSound
+    originalSamples = inputSound.sampleFloats
+    #print originalSamples
 
 # method to create filter based on current configuration and play filtered sound
 
@@ -417,8 +433,8 @@ def buttonClick():
     for key in entryDictionary.keys():
         entryDictionary[key][ENTRYROOT].addToList()
 
-    print "zero list: ", Zero.list
-    print "pole list: ", Pole.list
+    #print "zero list: ", Zero.list
+    #print "pole list: ", Pole.list
 
     soundFilter = Filter(Zero.list, Pole.list)
     filteredSamples = soundFilter.filterStream(originalSamples)
@@ -430,15 +446,20 @@ zPlane.bind("<Button-1>", zPlaneMouseClick)
 #zPlane.bind("<Motion>", zPlaneMouseClick)
 sPlane.bind("<Button-1>", sPlaneMouseClick)
 
-zPlane.bind("<Button-2>", mclick)
 zPlane.bind("<Button-3>", rclick)
 
 zPlane.grid(row=0, column=0)
 sPlane.grid(row=0, column=1)
-frame.grid(row=0, column=2)
+topFrame.grid(row=0, column=2)
+frame.grid(row=0, column=0)
+buttonFrame.grid(row=1, column=0)
 button.grid(row=1, column=1)
 button.config(command = buttonClick)
-
-#filename = tkFileDialog.askopenfilename()
+poleButton.grid(row=0, column=0)
+zeroButton.grid(row=0, column=1)
+poleButton.config(command = addPole)
+zeroButton.config(command = addZero)
+loadButton.grid(row=1, column=0)
+loadButton.config(command = loadSound)
 
 top.mainloop()

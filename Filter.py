@@ -31,22 +31,24 @@ class Filter:
 
             for coefficientIndex in range(1, len(self.zeroCoefficients)):
                 sample = self.previousInputs[coefficientIndex-1]
-                sample *= self.zeroCoefficients[coefficientIndex].real
+                sample *= +self.zeroCoefficients[coefficientIndex].real
                 outputStream[sampleIndex] += sample
             for coefficientIndex in range(1, len(self.poleCoefficients)):
                 sample = self.previousOutputs[coefficientIndex-1]
-                sample *= self.poleCoefficients[coefficientIndex].real
+                sample *= -self.poleCoefficients[coefficientIndex].real
                 outputStream[sampleIndex] += sample
 
             outputStream[sampleIndex] *= self.scaleFactor
 
             for inputIndex in range(len(self.previousInputs)-1, 0, -1):
                 self.previousInputs[inputIndex] = self.previousInputs[inputIndex-1]
-            self.previousInputs[0] = currentInput
+            if (len(self.previousInputs) > 0):
+                self.previousInputs[0] = currentInput
 
             for outputIndex in range(len(self.previousOutputs)-1, 0, -1):
                 self.previousOutputs[outputIndex] = self.previousOutputs[outputIndex-1]
-            self.previousOutputs[0] = outputStream[sampleIndex]
+            if (len(self.previousOutputs) > 0):
+                self.previousOutputs[0] = outputStream[sampleIndex]
 
         return outputStream
 
