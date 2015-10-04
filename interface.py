@@ -35,10 +35,10 @@ Proposed Design:
  -(DECLINED) graph s-plane from x of -c to c so that z-plane has radius from exp(-c) to exp(c)
  -graph frequency response by finding magnitude of various points in z- or s- plane
    -use cubic or cosine interpolation, include pole/zero angles in the sample points
- -(in progress) have ability to add single real point or a conjugate pair
- -(in progress) restrict poles to within unit circle for z-plane and negative half for s-plane
+ -(DONE: toggle via button) have ability to add single real point or a conjugate pair
+ -(DONE) restrict poles to within unit circle for z-plane and negative half for s-plane
  -(in progress) add buttons to play original audio and new, filtered audio
- -maybe use file dialog boxes for loading/saving WAV files?
+ -(in progress) maybe use file dialog boxes for loading/saving WAV files?
  -maybe use sliding window for graphing of audio wave forms?
  -maybe have ability to generate sounds (statics, waves, drum beats)?
  -(in progress) maybe an 'apply filter' button?
@@ -47,24 +47,21 @@ Proposed Design:
 
 '''
 Status:
- -core functionality mostly done
- -right click entry box to toggle between single real root and conjugate pair of roots
- -left click entry box to select an active root
- -middle click z-plane canvas to add new zero root at position 0.5
- -right click z-plane canvas to remove active root
- -left click z-plane and s-plane canvases to move active root
- -"Build and Play" button will construct filter, filter static sound, and play
+ -core functionality almost entirely done
+ -entry list GUI should be fully functional
+ -"Build and Play" button constructs filter, filters static sound, and plays
+ -"load sound" button works (at least for 16-bit mono WAV files)
+ -still need button to play original sound
+ -still need button to save filtered sound
 '''
 
 '''
 Issues:
- -Filter.py line 45 requires at least one previous output (not necessarily available)
- -Filter.py line 49 requires at least on previous output (not necessarily available)
- -constructed filters don't seem to match desired effect (POLE POSITIONS ARE REVERSED!)
  -better organization of Drawable class heirarchy?
  -use a dictionaryEntry class rather than a tuple
- -make sure new entries have root position displayed
  -must preform redraw when conjugate pair / real single is toggled (right click entry)
+ -when zero placed around 1 and pole pair placed around +/-i, sounds like clipping
+ -lots of renaming and reorganizing (likely with more modules)
 '''
 
 # Base class for roots of the complex transfer function (roots of numerator or denominator)
@@ -164,11 +161,27 @@ poleButton = Tkinter.Button(buttonFrame, text="add pole")
 zeroButton = Tkinter.Button(buttonFrame, text="add zero")
 loadButton = Tkinter.Button(top, text="load sound")
 
+# GUI element class to display an entry in the root list (right side of interface)
+
+class RootListEntry(Tkinter.Frame):
+    def __init__(self, parent=None):
+        Tkinter.Frame.__init__(self, parent)
+
+        self.label = Tkinter.Label(self, width=16, bg="white", relief=Tkinter.GROOVE, pady=4)
+        self.pairButton = Tkinter.Button(self, text="Pair")
+        self.removeButton = Tkinter.Button(self, text="Remove")
+
+        self.label.grid(row=0, column=0)
+        self.pairButton.grid(row=0, column=1)
+        self.removeButton.grid(row=0, column=2)
+
 '''
 Scale is determined by (canvasWidth-1) divided by domain of the graph
 Offset is simply the upper-left corner coordinate of the graph domain
 Padding is to compensate for the fact that canvas coordinates are offset by 2 pixels
 '''
+
+# wrapper class for a Tkinter canvas with transforms based on complex numbers
 
 class ComplexCanvas:
     def __init__(self, canvas, topLeftComplex, dimensionsComplex, paddingComplex = 2 + 2j):
@@ -227,7 +240,9 @@ log20 = cmath.log(2.0)
 log02 = cmath.log(0.2)
 pi = cmath.pi
 
-sPlaneComplex = ComplexCanvas(sPlane, log02 + 3.25j, (log20 - log02) + 6.4j)
+sPlaneComplex = ComplexCanvas(sPlane, log02 + 3.25j, (log20 - log02) + 6.5j)
+
+# independent canvas element classes that keep a reference to the canvas
 
 class DrawableRoot:
     def __init__(self, complexCanvas, position = 0.5, pair = False):
@@ -306,14 +321,14 @@ def makeActive(entry):
         key = id(activeEntry)
         entryDictionary[key][ZPLANEOVAL].setColor("black")
         entryDictionary[key][SPLANEOVAL].setColor("black")
-        activeEntry.config(bg="white")
+        activeEntry.label.config(bg="white")
 
     activeEntry = entry
 
     key = id(activeEntry)
     entryDictionary[key][ZPLANEOVAL].setColor("green")
     entryDictionary[key][SPLANEOVAL].setColor("green")
-    activeEntry.config(bg="green")
+    activeEntry.label.config(bg="green")
 
 def setActivePosition(position):
     key = id(activeEntry)
@@ -321,10 +336,10 @@ def setActivePosition(position):
     return entryDictionary[key][ENTRYROOT].getPosition()
 
 def entryClick(event):
-    makeActive(event.widget)
+    makeActive(event.widget._nametowidget(event.widget.winfo_parent()))
 
 def entryRightClick(event):
-    key = id(event.widget)
+    key = id(event.widget._nametowidget(event.widget.winfo_parent()))
     if (entryDictionary[key][ENTRYROOT].pair == True):
         entryDictionary[key][ENTRYROOT].pair = False
     else:
@@ -346,10 +361,27 @@ realAxisZero = sPlaneComplex.addLineItem(log02, log20, stipple="gray75")
 realAxisPositivePi = sPlaneComplex.addLineItem(log02 + pi*1j, log20 + pi*1j, stipple="gray75")
 realAxisNegativePi = sPlaneComplex.addLineItem(log02 - pi*1j, log20 - pi*1j, stipple="gray75")
 
+def removeActiveEntry():
+    global activeEntry
+
+    key = id(activeEntry)
+
+    entryDictionary[key][ZPLANEOVAL].remove()
+    entryDictionary[key][SPLANEOVAL].remove()
+    del entryDictionary[key]
+
+    activeEntry.destroy()
+    activeEntry = None
+
+def entryRemove(event):
+    makeActive(event.widget._nametowidget(event.widget.winfo_parent()))
+    removeActiveEntry()
+
 def addNewEntry(position, isZero):
-    entry = Tkinter.Entry(frame)
-    entry.bind("<Button-1>", entryClick)
-    entry.bind("<Button-3>", entryRightClick)
+    entry = RootListEntry(frame)
+    entry.label.bind("<Button-1>", entryClick)
+    entry.pairButton.bind("<Button-1>", entryRightClick)
+    entry.removeButton.bind("<Button-1>", entryRemove)
 
     for entryIndex in range(0, len(frame.winfo_children())):
         frame.winfo_children()[entryIndex].grid(row = entryIndex)
@@ -365,19 +397,9 @@ def addNewEntry(position, isZero):
         zPlaneRoot = DrawablePole(zPlaneComplex, entryRoot.getPosition())
         sPlaneRoot = DrawablePole(sPlaneComplex, cmath.log(entryRoot.getPosition()))
 
+    entry.label.config(text=repr(entryRoot.getPosition()))
+
     entryDictionary[key] = (zPlaneRoot, sPlaneRoot, entryRoot)
-
-def removeActiveEntry():
-    global activeEntry
-
-    key = id(activeEntry)
-
-    entryDictionary[key][ZPLANEOVAL].remove()
-    entryDictionary[key][SPLANEOVAL].remove()
-    del entryDictionary[key]
-
-    activeEntry.destroy()
-    activeEntry = None
 
 addNewEntry(0.5, False)
 addNewEntry(-0.5, True)
@@ -393,8 +415,7 @@ def updatePosition(position):
     entryDictionary[key][ZPLANEOVAL].setPosition(zPlanePoint)
     entryDictionary[key][SPLANEOVAL].setPosition(sPlanePoint)
 
-    activeEntry.delete(0, Tkinter.END)
-    activeEntry.insert(0, repr(position))
+    activeEntry.label.config(text=repr(position))
 
 def zPlaneMouseClick(event):
     complexMouse = zPlaneComplex.inverseTransformPoint(event.x + event.y * 1j)
@@ -418,11 +439,8 @@ def loadSound():
     global originalSamples
 
     filename = tkFileDialog.askopenfilename(filetypes=[("Waveform Audio", ".wav")])
-    #print filename
     inputSound = loadSoundFromFile(filename)
-    #print inputSound
     originalSamples = inputSound.sampleFloats
-    #print originalSamples
 
 # method to create filter based on current configuration and play filtered sound
 
@@ -433,9 +451,6 @@ def buttonClick():
     for key in entryDictionary.keys():
         entryDictionary[key][ENTRYROOT].addToList()
 
-    #print "zero list: ", Zero.list
-    #print "pole list: ", Pole.list
-
     soundFilter = Filter(Zero.list, Pole.list)
     filteredSamples = soundFilter.filterStream(originalSamples)
 
@@ -445,8 +460,6 @@ def buttonClick():
 zPlane.bind("<Button-1>", zPlaneMouseClick)
 #zPlane.bind("<Motion>", zPlaneMouseClick)
 sPlane.bind("<Button-1>", sPlaneMouseClick)
-
-zPlane.bind("<Button-3>", rclick)
 
 zPlane.grid(row=0, column=0)
 sPlane.grid(row=0, column=1)
