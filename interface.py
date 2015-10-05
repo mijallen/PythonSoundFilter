@@ -11,26 +11,11 @@ from Drawable import *
 
 inputSound = loadSoundFromFile('static.wav')
 
-zeroList = []
-zeroList.append(-0.5)
-
-poleList = []
-poleList.append(0.5)
-
-testFilter = Filter(zeroList, poleList)
-filteredSamples = testFilter.filterStream(inputSound.sampleFloats)
-
 originalSamples = inputSound.sampleFloats
-inputSound.sampleFloats = filteredSamples
 #saveSoundToFile(inputSound, 'out.wav')
 
 format = sound.AFMT_S16_LE
 snd = sound.Output(inputSound.sampleRate, inputSound.channelCount, format)
-#snd.play(getWaveBytes(inputSound))
-
-#normalizedSoundFloats = filteredSamples
-
-top = Tkinter.Tk()
 
 '''
 Proposed Design:
@@ -60,10 +45,8 @@ Status:
 
 '''
 Issues:
- -better organization of Drawable class heirarchy? Is heirarchy needed?
+ -better organization of Drawable class hierarchy? Is hierarchy needed?
  -when zero placed around 1 and pole pair placed around +/-i, sounds like clipping
- -lots of renaming and reorganizing (likely with more modules)
- -will want to make functions that work on a given entry rather than just the active one
 '''
 
 '''
@@ -79,19 +62,6 @@ GUI ideas:
    -actually, appears to be emergent behavior from graphing corrected positions!
 '''
 
-canvasWidth = 400
-canvasHeight = 400
-
-zPlane = Tkinter.Canvas(top, bg="white", width=canvasWidth, height=canvasHeight)
-sPlane = Tkinter.Canvas(top, bg="white", width=canvasWidth, height=canvasHeight)
-topFrame = Tkinter.Frame(top)
-frame = Tkinter.Frame(topFrame)
-buttonFrame = Tkinter.Frame(topFrame)
-button = Tkinter.Button(top, text="build and play")
-poleButton = Tkinter.Button(buttonFrame, text="add pole")
-zeroButton = Tkinter.Button(buttonFrame, text="add zero")
-loadButton = Tkinter.Button(top, text="load sound")
-
 # GUI element class to display an entry in the root list (right side of interface)
 
 class RootListEntry(Tkinter.Frame):
@@ -106,13 +76,83 @@ class RootListEntry(Tkinter.Frame):
         self.pairButton.grid(row=0, column=1)
         self.removeButton.grid(row=0, column=2)
 
-zPlaneComplex = ComplexCanvas(zPlane, -2+2j, 4+4j)
+# class to organize related items into a dictionary entry
+
+class EntryElements:
+    def __init__(self, zPlaneDrawable, sPlaneDrawable, complexRoot):
+        self.zPlaneDrawable = zPlaneDrawable
+        self.sPlaneDrawable = sPlaneDrawable
+        self.complexRoot = complexRoot
+
+# define some constants
+
+canvasWidth = 400
+canvasHeight = 400
 
 log20 = cmath.log(2.0)
 log02 = cmath.log(0.2)
 pi = cmath.pi
 
+# create new GUI context
+
+top = Tkinter.Tk()
+
+# add a canvas to represent the complex Z-plane
+
+zPlane = Tkinter.Canvas(top, bg="white", width=canvasWidth, height=canvasHeight)
+zPlane.grid(row=0, column=0)
+zPlaneComplex = ComplexCanvas(zPlane, -2+2j, 4+4j)
+
+# create Z-plane graph of three circles and a real axis
+
+unitCircle = zPlaneComplex.addOvalItem(-1-1j, 1+1j, outline="black")
+maximumCircle = zPlaneComplex.addOvalItem(-2-2j, 2+2j, outline="blue")
+minimumCircle = zPlaneComplex.addOvalItem(-0.2-0.2j, 0.2+0.2j, outline="red")
+realAxis = zPlaneComplex.addLineItem(-2.0, 2.0, stipple="gray75")
+
+# add a canvas to represent the complex S-plane
+
+sPlane = Tkinter.Canvas(top, bg="white", width=canvasWidth, height=canvasHeight)
+sPlane.grid(row=0, column=1)
 sPlaneComplex = ComplexCanvas(sPlane, log02 + 3.25j, (log20 - log02) + 6.5j)
+
+# create S-plane graph of three radius lines and three real axis lines
+
+unitLine = sPlaneComplex.addLineItem(0 + pi*1j, 0 - pi*1j, fill="black")
+maximumLine = sPlaneComplex.addLineItem(log20 + pi*1j, log20 - pi*1j, fill="blue")
+minimumLine = sPlaneComplex.addLineItem(log02 + pi*1j, log02 - pi*1j, fill="red")
+realAxisZero = sPlaneComplex.addLineItem(log02, log20, stipple="gray75")
+realAxisPositivePi = sPlaneComplex.addLineItem(log02 + pi*1j, log20 + pi*1j, stipple="gray75")
+realAxisNegativePi = sPlaneComplex.addLineItem(log02 - pi*1j, log20 - pi*1j, stipple="gray75")
+
+# create the entry list GUI based on a frame hierarchy
+
+entryListFrame = Tkinter.Frame(top)
+entryListFrame.grid(row=0, column=2)
+
+entryFrame = Tkinter.Frame(entryListFrame)
+entryFrame.grid(row=0, column=0)
+
+addButtonsFrame = Tkinter.Frame(entryListFrame)
+addButtonsFrame.grid(row=1, column=0)
+
+# create buttons to add a pole or zero
+
+addPoleButton = Tkinter.Button(addButtonsFrame, text="add pole")
+addPoleButton.grid(row=0, column=0)
+
+addZeroButton = Tkinter.Button(addButtonsFrame, text="add zero")
+addZeroButton.grid(row=0, column=1)
+
+# create a load sound button
+
+loadSoundButton = Tkinter.Button(top, text="load sound")
+loadSoundButton.grid(row=1, column=0)
+
+# create a build and play button
+
+playFilteredSoundButton = Tkinter.Button(top, text="build and play")
+playFilteredSoundButton.grid(row=1, column=1)
 
 '''
 # draw sound wave
@@ -127,16 +167,14 @@ for sampleIndex in range(1, len(normalizedSoundFloats)):
     canvas.create_line(xA, yA, xB, yB)
 '''
 
-class EntryElements:
-    def __init__(self, zPlaneDrawable, sPlaneDrawable, complexRoot):
-        self.zPlaneDrawable = zPlaneDrawable
-        self.sPlaneDrawable = sPlaneDrawable
-        self.complexRoot = complexRoot
+# declare a global entry dictionary and a specified 'active' entry
 
 entryDictionary = {}
 activeEntry = None
 
-def makeActive(entry):
+# functions to modify existing entries
+
+def makeEntryActive(entry):
     global activeEntry
 
     if (activeEntry != None):
@@ -152,77 +190,65 @@ def makeActive(entry):
     entryDictionary[key].sPlaneDrawable.setColor("green")
     activeEntry.label.config(bg="green")
 
-def setActivePosition(position):
-    key = id(activeEntry)
-    entryDictionary[key].complexRoot.setPosition(position)
-    return entryDictionary[key].complexRoot.getPosition()
-
-def entryClick(event):
-    makeActive(event.widget._nametowidget(event.widget.winfo_parent()))
-
-def updatePosition(position):
+def updateEntryPosition(entry, position):
     position = round(position.real, 5) + round(position.imag, 5) * 1j
-    position = setActivePosition(position)
+
+    key = id(entry)
+    entryDictionary[key].complexRoot.setPosition(position)
+    position = entryDictionary[key].complexRoot.getPosition()
 
     zPlanePoint = position
     sPlanePoint = cmath.log(position)
 
-    key = id(activeEntry)
     entryDictionary[key].zPlaneDrawable.setPosition(zPlanePoint)
     entryDictionary[key].sPlaneDrawable.setPosition(sPlanePoint)
 
-    activeEntry.label.config(text=repr(position))
+    entry.label.config(text=repr(position))
 
-def entryRightClick(event):
-    key = id(event.widget._nametowidget(event.widget.winfo_parent()))
-    if (entryDictionary[key].complexRoot.pair == True):
-        entryDictionary[key].complexRoot.pair = False
-    else:
-        entryDictionary[key].complexRoot.pair = True
-    updatePosition(entryDictionary[key].complexRoot.getPosition())
-
-# create Z-plane graph of three circles and a real axis
-
-unitCircle = zPlaneComplex.addOvalItem(-1-1j, 1+1j, outline="black")
-maximumCircle = zPlaneComplex.addOvalItem(-2-2j, 2+2j, outline="blue")
-minimumCircle = zPlaneComplex.addOvalItem(-0.2-0.2j, 0.2+0.2j, outline="red")
-realAxis = zPlaneComplex.addLineItem(-2.0, 2.0, stipple="gray75")
-
-# create S-plane graph of three radius lines and three real axis lines
-
-unitLine = sPlaneComplex.addLineItem(0 + pi*1j, 0 - pi*1j, fill="black")
-maximumLine = sPlaneComplex.addLineItem(log20 + pi*1j, log20 - pi*1j, fill="blue")
-minimumLine = sPlaneComplex.addLineItem(log02 + pi*1j, log02 - pi*1j, fill="red")
-realAxisZero = sPlaneComplex.addLineItem(log02, log20, stipple="gray75")
-realAxisPositivePi = sPlaneComplex.addLineItem(log02 + pi*1j, log20 + pi*1j, stipple="gray75")
-realAxisNegativePi = sPlaneComplex.addLineItem(log02 - pi*1j, log20 - pi*1j, stipple="gray75")
-
-def removeActiveEntry():
+def removeEntry(entry):
     global activeEntry
 
-    key = id(activeEntry)
+    key = id(entry)
+
+    if (key == id(activeEntry)):
+        activeEntry = None
 
     entryDictionary[key].zPlaneDrawable.remove()
     entryDictionary[key].sPlaneDrawable.remove()
     del entryDictionary[key]
 
-    activeEntry.destroy()
-    activeEntry = None
+    entry.destroy()
+
+# functions called when a GUI element of an entry is clicked
+
+def entrySelect(event):
+    entry = event.widget._nametowidget(event.widget.winfo_parent())
+    makeEntryActive(entry)
+
+def entryPair(event):
+    entry = event.widget._nametowidget(event.widget.winfo_parent())
+    key = id(entry)
+    if (entryDictionary[key].complexRoot.pair == True):
+        entryDictionary[key].complexRoot.pair = False
+    else:
+        entryDictionary[key].complexRoot.pair = True
+    updateEntryPosition(entry, entryDictionary[key].complexRoot.getPosition())
 
 def entryRemove(event):
-    makeActive(event.widget._nametowidget(event.widget.winfo_parent()))
-    removeActiveEntry()
+    entry = event.widget._nametowidget(event.widget.winfo_parent())
+    removeEntry(entry)
+
+# function to create a new entry
 
 def addNewEntry(position, isZero):
-    entry = RootListEntry(frame)
-    entry.label.bind("<Button-1>", entryClick)
-    entry.pairButton.bind("<Button-1>", entryRightClick)
+    entry = RootListEntry(entryFrame)
+    entry.label.bind("<Button-1>", entrySelect)
+    entry.pairButton.bind("<Button-1>", entryPair)
     entry.removeButton.bind("<Button-1>", entryRemove)
 
-    for entryIndex in range(0, len(frame.winfo_children())):
-        frame.winfo_children()[entryIndex].grid(row = entryIndex)
-
-    key = id(entry)
+   # organize existing list of entries
+    for entryIndex in range(0, len(entryFrame.winfo_children())):
+        entryFrame.winfo_children()[entryIndex].grid(row = entryIndex)
 
     if (isZero):
         entryRoot = Zero(position)
@@ -235,27 +261,43 @@ def addNewEntry(position, isZero):
 
     entry.label.config(text=repr(entryRoot.getPosition()))
 
+    key = id(entry)
     entryDictionary[key] = EntryElements(zPlaneRoot, sPlaneRoot, entryRoot)
 
-addNewEntry(0.5, False)
-addNewEntry(-0.5, True)
+# function to move active root based on clicking z-plane
 
 def zPlaneMouseClick(event):
     complexMouse = zPlaneComplex.inverseTransformPoint(event.x + event.y * 1j)
-    updatePosition(complexMouse)
+    if (activeEntry != None):
+        updateEntryPosition(activeEntry, complexMouse)
+
+zPlane.bind("<Button-1>", zPlaneMouseClick)
+#zPlane.bind("<Motion>", zPlaneMouseClick)
+
+# function to move active root based on clicking s-plane
 
 def sPlaneMouseClick(event):
     complexMouse = sPlaneComplex.inverseTransformPoint(event.x + event.y * 1j)
-    updatePosition(cmath.exp(complexMouse))
+    if (activeEntry != None):
+        updateEntryPosition(activeEntry, cmath.exp(complexMouse))
 
-def rclick(event):
-    removeActiveEntry()
+sPlane.bind("<Button-1>", sPlaneMouseClick)
+
+# function to add a new pole at 0.5 based on clicking add pole button
 
 def addPole():
     addNewEntry(0.5, False)
 
+addPoleButton.config(command = addPole)
+
+# function to add a new zero at 0.5 based on clicking add zero button
+
 def addZero():
     addNewEntry(0.5, True)
+
+addZeroButton.config(command = addZero)
+
+# method to load a sound based on clicking load sound button
 
 def loadSound():
     global inputSound
@@ -265,9 +307,11 @@ def loadSound():
     inputSound = loadSoundFromFile(filename)
     originalSamples = inputSound.sampleFloats
 
+loadSoundButton.config(command = loadSound)
+
 # method to create filter based on current configuration and play filtered sound
 
-def buttonClick():
+def playFilteredSound():
     Zero.list = []
     Pole.list = []
 
@@ -280,22 +324,11 @@ def buttonClick():
     inputSound.sampleFloats = filteredSamples
     snd.play(getWaveBytes(inputSound))
 
-zPlane.bind("<Button-1>", zPlaneMouseClick)
-#zPlane.bind("<Motion>", zPlaneMouseClick)
-sPlane.bind("<Button-1>", sPlaneMouseClick)
+playFilteredSoundButton.config(command = playFilteredSound)
 
-zPlane.grid(row=0, column=0)
-sPlane.grid(row=0, column=1)
-topFrame.grid(row=0, column=2)
-frame.grid(row=0, column=0)
-buttonFrame.grid(row=1, column=0)
-button.grid(row=1, column=1)
-button.config(command = buttonClick)
-poleButton.grid(row=0, column=0)
-zeroButton.grid(row=0, column=1)
-poleButton.config(command = addPole)
-zeroButton.config(command = addZero)
-loadButton.grid(row=1, column=0)
-loadButton.config(command = loadSound)
+# provide an initial configuration and start the main loop
+
+addNewEntry(0.5, False)
+addNewEntry(-0.5, True)
 
 top.mainloop()
