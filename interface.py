@@ -12,7 +12,6 @@ from Drawable import *
 inputSound = loadSoundFromFile('static.wav')
 
 originalSamples = inputSound.sampleFloats
-#saveSoundToFile(inputSound, 'out.wav')
 
 format = sound.AFMT_S16_LE
 snd = sound.Output(inputSound.sampleRate, inputSound.channelCount, format)
@@ -37,10 +36,10 @@ Proposed Design:
 Status:
  -core functionality almost entirely done
  -entry list GUI should be fully functional
- -"Build and Play" button constructs filter, filters static sound, and plays
+ -"play filtered" button constructs filter, filters static sound, and plays
  -"load sound" button works (at least for 16-bit mono WAV files)
- -still need button to play original sound
- -still need button to save filtered sound
+ -"play original" button plays loaded sound without filter (for comparison)
+ -"save sound" button works (still needs a default extension)
 '''
 
 '''
@@ -144,15 +143,27 @@ addPoleButton.grid(row=0, column=0)
 addZeroButton = Tkinter.Button(addButtonsFrame, text="add zero")
 addZeroButton.grid(row=0, column=1)
 
-# create a load sound button
+# create load and save sound buttons
 
-loadSoundButton = Tkinter.Button(top, text="load sound")
-loadSoundButton.grid(row=1, column=0)
+fileButtonFrame = Tkinter.Frame(top)
+fileButtonFrame.grid(row=1, column=0)
 
-# create a build and play button
+loadSoundButton = Tkinter.Button(fileButtonFrame, text="load sound")
+loadSoundButton.grid(row=0, column=0)
 
-playFilteredSoundButton = Tkinter.Button(top, text="build and play")
-playFilteredSoundButton.grid(row=1, column=1)
+saveSoundButton = Tkinter.Button(fileButtonFrame, text="save sound")
+saveSoundButton.grid(row=0, column=1)
+
+# create play buttons for filtered and original sound
+
+playButtonFrame = Tkinter.Frame(top)
+playButtonFrame.grid(row=1, column=1)
+
+playOriginalSoundButton = Tkinter.Button(playButtonFrame, text="play original")
+playOriginalSoundButton.grid(row=0, column=0)
+
+playFilteredSoundButton = Tkinter.Button(playButtonFrame, text="play filtered")
+playFilteredSoundButton.grid(row=0, column=1)
 
 '''
 # draw sound wave
@@ -308,6 +319,33 @@ def loadSound():
     originalSamples = inputSound.sampleFloats
 
 loadSoundButton.config(command = loadSound)
+
+# method to save a filtered sound based on a button press
+
+def saveSound():
+    Zero.list = []
+    Pole.list = []
+
+    for key in entryDictionary.keys():
+        entryDictionary[key].complexRoot.addToList()
+
+    soundFilter = Filter(Zero.list, Pole.list)
+    filteredSamples = soundFilter.filterStream(originalSamples)
+
+    inputSound.sampleFloats = filteredSamples
+
+    filename = tkFileDialog.asksaveasfilename(filetypes=[("Waveform Audio", ".wav")])
+    saveSoundToFile(inputSound, filename)
+
+saveSoundButton.config(command = saveSound)
+
+# method to play original sound based on a button press
+
+def playOriginalSound():
+    inputSound.sampleFloats = originalSamples
+    snd.play(getWaveBytes(inputSound))
+
+playOriginalSoundButton.config(command = playOriginalSound)
 
 # method to create filter based on current configuration and play filtered sound
 
