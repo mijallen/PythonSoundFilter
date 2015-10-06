@@ -1,7 +1,7 @@
 import wave
 #import pymedia.audio.sound as sound
 
-class Sound:
+class SoundInfo:
    # listing of common sampling rates in a wave file
     SampleRate8000Hz = 8000
     SampleRate11025Hz = 11025
@@ -20,10 +20,9 @@ class Sound:
     BitDepth32 = 4
 
     def __init__(self):
-        self.sampleRate = Sound.SampleRate44100Hz
+        self.sampleRate = SoundInfo.SampleRate44100Hz
         self.channelCount = 1
-        self.sampleByteDepth = Sound.BitDepth16
-        self.sampleFloats = []
+        self.sampleByteDepth = SoundInfo.BitDepth16
 
     def findByteRate(self):
         return (self.sampleRate * self.channelCount * self.sampleByteDepth)
@@ -31,8 +30,8 @@ class Sound:
     def findBitRate(self):
         return (8.0 * self.findByteRate())
 
-    def findLengthInSeconds(self):
-        return (1.0 * len(self.sampleFloats) / self.sampleRate)
+    def findLengthInSeconds(self, sampleArray):
+        return (1.0 * len(sampleArray) / self.sampleRate)
 
 # private subroutine for extracting samples as floats from wave file byte data
 
@@ -55,7 +54,7 @@ def _convertByteDataToFloats(arrayOfBytes, bytesPerFloat):
    # correct sample range to [-1,+1]
     for sampleIndex in range(0, sampleCount):
         normalizedSampleFloats[sampleIndex] *= 2.0
-        if (bytesPerFloat == Sound.BitDepth8):
+        if (bytesPerFloat == SoundInfo.BitDepth8):
             normalizedSampleFloats[sampleIndex] = 2.0 * normalizedSampleFloats[sampleIndex] - 1.0
         else:
             if normalizedSampleFloats[sampleIndex] > 1.0:
@@ -69,7 +68,7 @@ def _convertFloatsToByteData(arrayOfFloats, bytesPerFloat):
    # place samples back into range [0,1]
     renormalizedFloats = [sample for sample in arrayOfFloats]
     for sampleIndex in range(0, len(renormalizedFloats)):
-        if (bytesPerFloat == Sound.BitDepth8):
+        if (bytesPerFloat == SoundInfo.BitDepth8):
             renormalizedFloats[sampleIndex] = 0.5 * renormalizedFloats[sampleIndex] + 0.5
         else:
             if renormalizedFloats[sampleIndex] < 0.0:
@@ -96,34 +95,34 @@ def _convertFloatsToByteData(arrayOfFloats, bytesPerFloat):
 # public subroutine for getting sound data from wave file
 
 def loadSoundFromFile(fileName):
-    loadedSound = Sound()
+    loadedSoundInfo = SoundInfo()
 
     waveFile = wave.open(fileName, 'rb')
-    loadedSound.sampleRate = waveFile.getframerate()
-    loadedSound.channelCount = waveFile.getnchannels()
-    loadedSound.sampleByteDepth = waveFile.getsampwidth()
+    loadedSoundInfo.sampleRate = waveFile.getframerate()
+    loadedSoundInfo.channelCount = waveFile.getnchannels()
+    loadedSoundInfo.sampleByteDepth = waveFile.getsampwidth()
 
     waveBytes = waveFile.readframes(waveFile.getnframes())
     waveFile.close()
 
-    loadedSound.sampleFloats = _convertByteDataToFloats(waveBytes, loadedSound.sampleByteDepth)
+    loadedSoundSamples = _convertByteDataToFloats(waveBytes, loadedSoundInfo.sampleByteDepth)
 
-    return loadedSound
+    return loadedSoundInfo, loadedSoundSamples
 
 # public subroutine for writing a sound out to a wave file
 
-def saveSoundToFile(soundToSave, fileName):
+def saveSoundToFile(soundToSaveInfo, soundSamples, fileName):
     waveFile = wave.open(fileName, 'wb')
-    waveFile.setframerate(soundToSave.sampleRate)
-    waveFile.setnchannels(soundToSave.channelCount)
-    waveFile.setsampwidth(soundToSave.sampleByteDepth)
+    waveFile.setframerate(soundToSaveInfo.sampleRate)
+    waveFile.setnchannels(soundToSaveInfo.channelCount)
+    waveFile.setsampwidth(soundToSaveInfo.sampleByteDepth)
 
-    waveBytes = _convertFloatsToByteData(soundToSave.sampleFloats, soundToSave.sampleByteDepth)
+    waveBytes = _convertFloatsToByteData(soundSamples, soundToSaveInfo.sampleByteDepth)
 
     waveFile.writeframes(waveBytes)
     waveFile.close()
 
 # public subroutine to return byte representation of sound (pymedia cannot be encapsulated here?)
 
-def getWaveBytes(inputSound):
-    return _convertFloatsToByteData(inputSound.sampleFloats, inputSound.sampleByteDepth)
+def getWaveBytes(inputSoundInfo, soundSamples):
+    return _convertFloatsToByteData(soundSamples, inputSoundInfo.sampleByteDepth)

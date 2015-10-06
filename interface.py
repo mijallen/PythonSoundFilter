@@ -9,57 +9,34 @@ from Filter import *
 from ComplexRoot import *
 from Drawable import *
 
-inputSound = loadSoundFromFile('static.wav')
-
-originalSamples = inputSound.sampleFloats
+inputSoundInfo, originalSamples = loadSoundFromFile('static.wav')
 
 format = sound.AFMT_S16_LE
-snd = sound.Output(inputSound.sampleRate, inputSound.channelCount, format)
+snd = sound.Output(inputSoundInfo.sampleRate, inputSoundInfo.channelCount, format)
 
 '''
-Proposed Design:
- -(DECLINED) use non-linear radius expansion for z-plane graph (radius squared?)
- -(DECLINED) graph s-plane from x of -c to c so that z-plane has radius from exp(-c) to exp(c)
+Possible Additions:
  -graph frequency response by finding magnitude of various points in z- or s- plane
    -use cubic or cosine interpolation, include pole/zero angles in the sample points
- -(DONE: toggle via button) have ability to add single real point or a conjugate pair
- -(DONE) restrict poles to within unit circle for z-plane and negative half for s-plane
- -(in progress) add buttons to play original audio and new, filtered audio
- -(in progress) maybe use file dialog boxes for loading/saving WAV files?
- -maybe use sliding window for graphing of audio wave forms?
- -maybe have ability to generate sounds (statics, waves, drum beats)?
- -(in progress) maybe an 'apply filter' button?
- -should sound info be its own class and the float array be separate?
+ -sliding window for graphing of audio wave forms
+ -ability to generate sounds (statics, waves, drum beats)
 '''
 
 '''
-Status:
- -core functionality almost entirely done
- -entry list GUI should be fully functional
- -"play filtered" button constructs filter, filters static sound, and plays
- -"load sound" button works (at least for 16-bit mono WAV files)
- -"play original" button plays loaded sound without filter (for comparison)
- -"save sound" button works (still needs a default extension)
+# possible code for drawing a sound wave
+canvas.create_line(0.0, 256.0, 512.0, 256.0)
+widthCompressionFactor = 512.0 / len(normalizedSoundFloats)
+
+for sampleIndex in range(1, len(normalizedSoundFloats)):
+    xA = (sampleIndex - 1) * widthCompressionFactor
+    yA = 256.0 - 128.0 * normalizedSoundFloats[sampleIndex - 1]
+    xB = sampleIndex * widthCompressionFactor
+    yB = 256.0 - 128.0 * normalizedSoundFloats[sampleIndex]
+    canvas.create_line(xA, yA, xB, yB)
 '''
 
-'''
-Issues:
- -better organization of Drawable class hierarchy? Is hierarchy needed?
- -when zero placed around 1 and pole pair placed around +/-i, sounds like clipping
-'''
+#when zero placed around 1 and pole pair placed around +/-i, sounds like clipping
 
-'''
-GUI ideas:
- -add/remove/modify subroutines operate on list of "entries" in dictionary
-   -will be used to update canvases and zero/pole list frame
- -click entry in zero/pole list frame to select as active
- -removing zero/pole can make activeEntry invalid (None as invalid code)
- -group zeros and poles together, have different modifying subroutines
- -group single reals and conjugate pairs together also (different subroutines)
- -to move a single real in the s-plane from 0j to +/-pij, use half-spaces
-   -boundaries determined at +/-pij/2, click beyond to alternate 0 and pi phases
-   -actually, appears to be emergent behavior from graphing corrected positions!
-'''
 
 # GUI element class to display an entry in the root list (right side of interface)
 
@@ -164,19 +141,6 @@ playOriginalSoundButton.grid(row=0, column=0)
 
 playFilteredSoundButton = Tkinter.Button(playButtonFrame, text="play filtered")
 playFilteredSoundButton.grid(row=0, column=1)
-
-'''
-# draw sound wave
-canvas.create_line(0.0, 256.0, 512.0, 256.0)
-widthCompressionFactor = 512.0 / len(normalizedSoundFloats)
-
-for sampleIndex in range(1, len(normalizedSoundFloats)):
-    xA = (sampleIndex - 1) * widthCompressionFactor
-    yA = 256.0 - 128.0 * normalizedSoundFloats[sampleIndex - 1]
-    xB = sampleIndex * widthCompressionFactor
-    yB = 256.0 - 128.0 * normalizedSoundFloats[sampleIndex]
-    canvas.create_line(xA, yA, xB, yB)
-'''
 
 # declare a global entry dictionary and a specified 'active' entry
 
@@ -311,12 +275,11 @@ addZeroButton.config(command = addZero)
 # method to load a sound based on clicking load sound button
 
 def loadSound():
-    global inputSound
+    global inputSoundInfo
     global originalSamples
 
     filename = tkFileDialog.askopenfilename(filetypes=[("Waveform Audio", ".wav")])
-    inputSound = loadSoundFromFile(filename)
-    originalSamples = inputSound.sampleFloats
+    inputSoundInfo, originalSamples = loadSoundFromFile(filename)
 
 loadSoundButton.config(command = loadSound)
 
@@ -332,18 +295,16 @@ def saveSound():
     soundFilter = Filter(Zero.list, Pole.list)
     filteredSamples = soundFilter.filterStream(originalSamples)
 
-    inputSound.sampleFloats = filteredSamples
-
-    filename = tkFileDialog.asksaveasfilename(filetypes=[("Waveform Audio", ".wav")])
-    saveSoundToFile(inputSound, filename)
+    filename = tkFileDialog.asksaveasfilename(filetypes=[("Waveform Audio", ".wav")],
+        defaultextension='.wav')
+    saveSoundToFile(inputSoundInfo, filteredSamples, filename)
 
 saveSoundButton.config(command = saveSound)
 
 # method to play original sound based on a button press
 
 def playOriginalSound():
-    inputSound.sampleFloats = originalSamples
-    snd.play(getWaveBytes(inputSound))
+    snd.play(getWaveBytes(inputSoundInfo, originalSamples))
 
 playOriginalSoundButton.config(command = playOriginalSound)
 
@@ -359,8 +320,7 @@ def playFilteredSound():
     soundFilter = Filter(Zero.list, Pole.list)
     filteredSamples = soundFilter.filterStream(originalSamples)
 
-    inputSound.sampleFloats = filteredSamples
-    snd.play(getWaveBytes(inputSound))
+    snd.play(getWaveBytes(inputSoundInfo, filteredSamples))
 
 playFilteredSoundButton.config(command = playFilteredSound)
 
