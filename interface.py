@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import Tkinter, tkFileDialog
+import Tkinter, tkFileDialog, tkMessageBox
 import cmath
 import pymedia.audio.sound as sound
 
@@ -141,6 +141,11 @@ playOriginalSoundButton.grid(row=0, column=0)
 
 playFilteredSoundButton = Tkinter.Button(playButtonFrame, text="play filtered")
 playFilteredSoundButton.grid(row=0, column=1)
+
+# create show coefficients button
+
+showCoefficientsButton = Tkinter.Button(top, text="show coeffients")
+showCoefficientsButton.grid(row=1, column=2)
 
 # declare a global entry dictionary and a specified 'active' entry
 
@@ -323,6 +328,35 @@ def playFilteredSound():
     snd.play(getWaveBytes(inputSoundInfo, filteredSamples))
 
 playFilteredSoundButton.config(command = playFilteredSound)
+
+# method to show how to build the given filter
+
+def showCoefficients():
+    Zero.list = []
+    Pole.list = []
+
+    for key in entryDictionary.keys():
+        entryDictionary[key].complexRoot.addToList()
+
+    soundFilter = Filter(Zero.list, Pole.list)
+
+    message = "y[n] = " + repr(round(soundFilter.scaleFactor, 5)) + " * ("
+
+    for index, coefficient in enumerate(soundFilter.zeroCoefficients):
+        message += repr(round(coefficient.real, 5)) + " * x[n-" + repr(index) + "] + "
+
+    message = message[0:len(message)-3] + ") + "
+
+    poleCoefficientCount = len(soundFilter.poleCoefficients)
+
+    for index, coefficient in enumerate(soundFilter.poleCoefficients[1:poleCoefficientCount]):
+        message += repr(round(coefficient.real, 5)) + " * y[n-" + repr(index+1) + "] + "
+
+    message = message[0:len(message)-3]
+
+    tkMessageBox.showinfo("Filter Configuration", message)
+
+showCoefficientsButton.config(command = showCoefficients)
 
 # provide an initial configuration and start the main loop
 
